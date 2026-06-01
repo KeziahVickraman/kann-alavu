@@ -1,59 +1,16 @@
 import React from 'react';
 
-const BrowseRecipes = ({ onSelectRecipe, onNavigateToAdd }) => {
+const BrowseRecipes = ({ recipes, onSelectRecipe, onNavigateToAdd }) => {
   const [searchQuery, setSearchQuery] = React.useState('');
   const [selectedFilter, setSelectedFilter] = React.useState('All');
 
   const filters = ['All', "Amma's Recipes", 'Kann Alavu', 'TikTok Saved'];
 
-  const recipes = [
-    {
-      id: 'fish-curry',
-      title: "Amma's Fish Curry",
-      image: 'https://images.unsplash.com/photo-1565557623262-b51c2513a641?auto=format&fit=crop&q=80&w=600',
-      source: 'Amma',
-      sourceType: 'amma',
-      badgeColor: 'bg-[#6f4627] text-white',
-    },
-    {
-      id: 'pepper-rasam',
-      title: "Amma's Pepper Rasam",
-      image: 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?auto=format&fit=crop&q=80&w=600',
-      source: 'Family Heritage',
-      sourceType: 'amma',
-      badgeColor: 'bg-[#6f4627] text-white',
-    },
-    {
-      id: 'honey-potatoes',
-      title: 'Crispy Honey Potatoes',
-      image: 'https://images.unsplash.com/photo-1518310383802-640c2de311b2?auto=format&fit=crop&q=80&w=600',
-      source: 'TikTok',
-      sourceType: 'tiktok',
-      badgeColor: 'bg-[#00f2fe]/10 text-[#00a8b5]',
-    },
-    {
-      id: 'samosas',
-      title: "Grandma's Samosas",
-      image: 'https://images.unsplash.com/photo-1601050690597-df056fb4ce78?auto=format&fit=crop&q=80&w=600',
-      source: 'Grandma',
-      sourceType: 'amma',
-      badgeColor: 'bg-[#6f4627] text-white',
-    },
-    {
-      id: 'poached-toast',
-      title: 'Insta-Poached Toast',
-      image: 'https://images.unsplash.com/photo-1525351484163-7529414344d8?auto=format&fit=crop&q=80&w=600',
-      source: 'Instagram',
-      sourceType: 'instagram',
-      badgeColor: 'bg-[#e1306c]/10 text-[#e1306c]',
-    }
-  ];
-
   const filteredRecipes = recipes.filter(recipe => {
     const matchesSearch = recipe.title.toLowerCase().includes(searchQuery.toLowerCase());
     if (selectedFilter === 'All') return matchesSearch;
-    if (selectedFilter === "Amma's Recipes") return matchesSearch && (recipe.sourceType === 'amma' && recipe.source !== 'Family Heritage');
-    if (selectedFilter === 'Kann Alavu') return matchesSearch && recipe.id === 'fish-curry'; // Has direct custom eyeball instructions
+    if (selectedFilter === "Amma's Recipes") return matchesSearch && (recipe.sourceType === 'amma' && recipe.source !== 'Family Heritage' && !recipe.isCustom);
+    if (selectedFilter === 'Kann Alavu') return matchesSearch && (recipe.id === 'fish-curry' || recipe.ingredients.some(i => i.badge));
     if (selectedFilter === 'TikTok Saved') return matchesSearch && recipe.sourceType === 'tiktok';
     return matchesSearch;
   });

@@ -1,10 +1,10 @@
 import React from 'react';
 
-const RecipeDetail = ({ recipeId, onNavigateBack }) => {
+const RecipeDetail = ({ recipeId, recipes, onNavigateBack }) => {
   const [voicePlaying, setVoicePlaying] = React.useState(false);
 
-  // Mock details for the recipe
-  const recipe = {
+  // Find the recipe dynamically from the database prop
+  const recipe = recipes.find(r => r.id === recipeId) || {
     id: 'fish-curry',
     title: "Amma's Fish Curry",
     image: 'https://images.unsplash.com/photo-1565557623262-b51c2513a641?auto=format&fit=crop&q=80&w=600',
