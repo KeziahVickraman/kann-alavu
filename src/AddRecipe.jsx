@@ -1,40 +1,152 @@
 import React from 'react';
 
+const readStoredValue = (key, fallback) => {
+  try {
+    return localStorage.getItem(key) ?? fallback;
+  } catch {
+    return fallback;
+  }
+};
+
+const readStoredBoolean = (key) => {
+  return readStoredValue(key, 'false') === 'true';
+};
+
+const readStoredJson = (key, fallback) => {
+  try {
+    const saved = localStorage.getItem(key);
+    return saved ? JSON.parse(saved) : fallback;
+  } catch {
+    return fallback;
+  }
+};
+
+const EXTRACTION_ERROR_MESSAGE = "Couldn't extract a recipe from that link. Try pasting the recipe manually.";
+const MISSING_TEXT_ERROR_MESSAGE = 'Paste the caption or recipe text below, then import.';
+const SOCIAL_URL_TIP = "Open this post, copy the caption or recipe text, and paste it below. We'll do the rest.";
+const SOURCE_TAGS = ['TikTok', 'Instagram', 'YouTube', 'Manual'];
+
+const EXTRACTION_SYSTEM_PROMPT = 'You are a recipe extraction assistant. Extract a recipe from the following text and return JSON only — no markdown, no explanation, no backticks. Return exactly this shape: { "title": "string", "ingredients": [{ "name": "string", "quantity": "string", "unit": "string", "customAlavu": "string or empty string" }], "steps": ["string"], "ammasNotes": "string or empty string" }. For customAlavu, if the source describes an ingredient by feel or sense rather than precise measurement, capture that sensory description. Otherwise empty string.';
+const URL_EXTRACTION_SYSTEM_PROMPT = 'You are a recipe extraction assistant. When given a publicly readable recipe URL, extract the recipe and return JSON only — no markdown, no explanation, no backticks. Return exactly this shape: { "title": "string", "ingredients": [{ "name": "string", "quantity": "string", "unit": "string", "customAlavu": "string or empty string" }], "steps": ["string"], "ammasNotes": "string or empty string" }. For customAlavu, if the source describes an ingredient by feel or sense rather than precise measurement, capture that sensory description. Otherwise empty string.';
+
+const isSocialRecipeUrl = (value) => {
+  return /(?:^|\.)tiktok\.com\/|(?:^|\.)instagram\.com\//i.test(value.trim());
+};
+
+const getSourceTag = (value) => {
+  const trimmedValue = value.trim();
+  if (/(?:^|\.)tiktok\.com\//i.test(trimmedValue)) return 'TikTok';
+  if (/(?:^|\.)instagram\.com\//i.test(trimmedValue)) return 'Instagram';
+  if (/(?:^|\.)youtube\.com\/|(?:^|\.)youtu\.be\//i.test(trimmedValue)) return 'YouTube';
+  return 'Manual';
+};
+
+const truncateUrl = (value) => {
+  return value.length > 42 ? `${value.slice(0, 39)}...` : value;
+};
+
+const uniqueTags = (nextTags) => {
+  return [...new Set(nextTags.map((tag) => tag.trim()).filter(Boolean))];
+};
+
+const extractJsonObject = (text) => {
+  const withoutFences = text
+    .trim()
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```$/i, '')
+    .trim();
+  const jsonStart = withoutFences.indexOf('{');
+  const jsonEnd = withoutFences.lastIndexOf('}');
+
+  if (jsonStart === -1 || jsonEnd === -1 || jsonEnd <= jsonStart) {
+    throw new Error('No JSON object found in extraction response');
+  }
+
+  return withoutFences.slice(jsonStart, jsonEnd + 1);
+};
+
+const parseExtractionResponse = (text, rawApiResponse) => {
+  const parsed = JSON.parse(extractJsonObject(text));
+  const ingredients = Array.isArray(parsed.ingredients)
+    ? parsed.ingredients.map((ingredient) => ({
+      name: String(ingredient.name || ''),
+      quantity: String(ingredient.quantity || ''),
+      unit: String(ingredient.unit || ''),
+      customAlavu: String(ingredient.customAlavu || '')
+    })).filter((ingredient) => ingredient.name.trim() !== '')
+    : [];
+  const steps = Array.isArray(parsed.steps)
+    ? parsed.steps.map((step) => String(step || '')).filter((step) => step.trim() !== '')
+    : [];
+
+  if (
+    typeof parsed.title !== 'string'
+    || parsed.title.trim() === ''
+    || ingredients.length === 0
+    || steps.length === 0
+  ) {
+    const error = new Error('Invalid extraction response');
+    console.error('Recipe extraction validation failed', {
+      error,
+      rawApiResponse,
+      extractedText: text,
+      parsed
+    });
+    throw error;
+  }
+
+  return {
+    title: parsed.title,
+    ingredients,
+    steps,
+    ammasNotes: typeof parsed.ammasNotes === 'string' ? parsed.ammasNotes : ''
+  };
+};
+
 const AddRecipe = ({ onAddRecipe, onNavigateBack }) => {
   // Persistence using localstorage so navigating away and returning preserves edit state
   const [editorExpanded, setEditorExpanded] = React.useState(() => {
-    return localStorage.getItem('kann_alavu_editor_expanded') === 'true';
+    return readStoredBoolean('kann_alavu_editor_expanded');
   });
 
   const [recipeTitle, setRecipeTitle] = React.useState(() => {
-    return localStorage.getItem('kann_alavu_recipe_title') || '';
+    return readStoredValue('kann_alavu_recipe_title', '');
   });
 
   const [ingredients, setIngredients] = React.useState(() => {
-    const saved = localStorage.getItem('kann_alavu_ingredients');
-    return saved ? JSON.parse(saved) : [
+    return readStoredJson('kann_alavu_ingredients', [
       { id: 'ing-1', name: '', quantity: '', unit: 'g', customAlavu: '' }
-    ];
+    ]);
   });
 
   const [steps, setSteps] = React.useState(() => {
-    const saved = localStorage.getItem('kann_alavu_steps');
-    return saved ? JSON.parse(saved) : [
+    return readStoredJson('kann_alavu_steps', [
       { id: 'step-1', text: '' }
-    ];
+    ]);
   });
 
   const [showAlavuToggle, setShowAlavuToggle] = React.useState(() => {
-    return localStorage.getItem('kann_alavu_show_alavu') === 'true';
+    return readStoredBoolean('kann_alavu_show_alavu');
   });
 
   const [ammasNotes, setAmmasNotes] = React.useState(() => {
-    return localStorage.getItem('kann_alavu_ammas_notes') || '';
+    return readStoredValue('kann_alavu_ammas_notes', '');
   });
 
   const [url, setUrl] = React.useState('');
+  const trimmedUrl = url.trim();
+  const isSocialUrl = isSocialRecipeUrl(trimmedUrl);
+  const showCaptionField = trimmedUrl && isSocialUrl;
+  const [pastedRecipeText, setPastedRecipeText] = React.useState('');
+  const [importedSourceUrl, setImportedSourceUrl] = React.useState('');
   const [importing, setImporting] = React.useState(false);
+  const [importError, setImportError] = React.useState('');
   const [expandedAlavuIds, setExpandedAlavuIds] = React.useState([]);
+  const [customTagInput, setCustomTagInput] = React.useState('');
+  const [tags, setTags] = React.useState(() => {
+    return readStoredJson('kann_alavu_tags', ['Manual']);
+  });
+  const sourceTag = getSourceTag(trimmedUrl);
 
   const toggleAlavuDrilldown = (id) => {
     if (expandedAlavuIds.includes(id)) {
@@ -42,6 +154,29 @@ const AddRecipe = ({ onAddRecipe, onNavigateBack }) => {
     } else {
       setExpandedAlavuIds([...expandedAlavuIds, id]);
     }
+  };
+
+  const toggleTag = (tag) => {
+    setTags((currentTags) => {
+      if (currentTags.includes(tag)) {
+        return currentTags.filter((item) => item !== tag);
+      }
+      return uniqueTags([...currentTags, tag]);
+    });
+  };
+
+  const addCustomTag = () => {
+    const nextTag = customTagInput.trim();
+    if (!nextTag) return;
+    setTags((currentTags) => uniqueTags([...currentTags, nextTag]));
+    setCustomTagInput('');
+  };
+
+  const setSourceTag = (tag) => {
+    setTags((currentTags) => uniqueTags([
+      ...currentTags.filter((item) => !SOURCE_TAGS.includes(item)),
+      tag
+    ]));
   };
 
   // Sync to localStorage
@@ -52,7 +187,8 @@ const AddRecipe = ({ onAddRecipe, onNavigateBack }) => {
     localStorage.setItem('kann_alavu_steps', JSON.stringify(steps));
     localStorage.setItem('kann_alavu_show_alavu', showAlavuToggle);
     localStorage.setItem('kann_alavu_ammas_notes', ammasNotes);
-  }, [editorExpanded, recipeTitle, ingredients, steps, showAlavuToggle, ammasNotes]);
+    localStorage.setItem('kann_alavu_tags', JSON.stringify(tags));
+  }, [editorExpanded, recipeTitle, ingredients, steps, showAlavuToggle, ammasNotes, tags]);
 
   // Reset form helper
   const resetForm = () => {
@@ -61,6 +197,11 @@ const AddRecipe = ({ onAddRecipe, onNavigateBack }) => {
     setSteps([{ id: 'step-1', text: '' }]);
     setShowAlavuToggle(false);
     setAmmasNotes('');
+    setUrl('');
+    setPastedRecipeText('');
+    setImportedSourceUrl('');
+    setCustomTagInput('');
+    setTags(['Manual']);
     setEditorExpanded(false);
     localStorage.removeItem('kann_alavu_editor_expanded');
     localStorage.removeItem('kann_alavu_recipe_title');
@@ -68,6 +209,7 @@ const AddRecipe = ({ onAddRecipe, onNavigateBack }) => {
     localStorage.removeItem('kann_alavu_steps');
     localStorage.removeItem('kann_alavu_show_alavu');
     localStorage.removeItem('kann_alavu_ammas_notes');
+    localStorage.removeItem('kann_alavu_tags');
   };
 
   // Ingredients operations
@@ -127,25 +269,96 @@ const AddRecipe = ({ onAddRecipe, onNavigateBack }) => {
     setSteps(newSteps);
   };
 
-  // Import handler for existing flow
-  const handleImport = () => {
-    if (!url.trim()) return;
+  const handleImport = async () => {
+    const extractionText = isSocialUrl ? pastedRecipeText.trim() : trimmedUrl;
+    if (!extractionText) {
+      setImportError(isSocialUrl ? MISSING_TEXT_ERROR_MESSAGE : EXTRACTION_ERROR_MESSAGE);
+      return;
+    }
     setImporting(true);
-    setTimeout(() => {
-      setImporting(false);
-      alert('Successfully imported recipe metadata!');
-      setRecipeTitle('Spicy Tamarind Curry Noodles');
-      setIngredients([
-        { id: 'ing- noodles', name: 'Egg Noodles', quantity: '200', unit: 'g', customAlavu: '' },
-        { id: 'ing- oil', name: 'Vegetable Oil', quantity: '2', unit: 'tbsp', customAlavu: 'until fragrant' },
-        { id: 'ing- paste', name: 'Tamarind Paste', quantity: '1', unit: 'tbsp', customAlavu: 'tangy flavor' }
-      ]);
-      setSteps([
-        { id: 'step-1', text: 'Boil noodles according to package instructions.' },
-        { id: 'step-2', text: 'Heat oil and sauté paste until fragrant and oil beads.' }
-      ]);
+    setImportError('');
+    let rawApiResponse = null;
+    let extractedText = '';
+
+    try {
+      // TODO: Move this API call to a server-side function before production.
+      const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY?.trim();
+      if (!apiKey) {
+        throw new Error('Missing VITE_ANTHROPIC_API_KEY. Restart the Vite dev server after editing .env.local.');
+      }
+
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true'
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 4000,
+          system: isSocialUrl ? EXTRACTION_SYSTEM_PROMPT : URL_EXTRACTION_SYSTEM_PROMPT,
+          messages: [
+            {
+              role: 'user',
+              content: isSocialUrl
+                ? `Extract the recipe from this text: ${extractionText}`
+                : `Extract the recipe from this URL: ${extractionText}`
+            }
+          ]
+        })
+      });
+
+      const rawResponseText = await response.text();
+      try {
+        rawApiResponse = JSON.parse(rawResponseText);
+      } catch {
+        rawApiResponse = rawResponseText;
+      }
+
+      if (!response.ok) {
+        throw new Error(`Extraction request failed with status ${response.status}`);
+      }
+
+      extractedText = rawApiResponse.content?.find((item) => item.type === 'text')?.text || '';
+      if (!extractedText) {
+        throw new Error('Missing extraction text');
+      }
+
+      const extractedRecipe = parseExtractionResponse(extractedText, rawApiResponse);
+      const importId = String(rawApiResponse.id || extractedRecipe.title).replace(/[^a-z0-9]/gi, '-').toLowerCase();
+      const nextIngredients = extractedRecipe.ingredients.map((ingredient, index) => ({
+        id: `ing-${importId}-${index}`,
+        name: ingredient.name,
+        quantity: ingredient.quantity,
+        unit: ingredient.unit,
+        customAlavu: ingredient.customAlavu
+      }));
+      const nextSteps = extractedRecipe.steps.map((step, index) => ({
+        id: `step-${importId}-${index}`,
+        text: step
+      }));
+      const nextSourceTag = getSourceTag(trimmedUrl);
+
+      setRecipeTitle(extractedRecipe.title);
+      setIngredients(nextIngredients);
+      setSteps(nextSteps);
+      setAmmasNotes(extractedRecipe.ammasNotes);
+      setShowAlavuToggle(nextIngredients.some((ingredient) => ingredient.customAlavu.trim() !== ''));
+      setImportedSourceUrl(trimmedUrl);
+      setSourceTag(nextSourceTag);
       setEditorExpanded(true);
-    }, 1200);
+    } catch (error) {
+      console.error('Recipe extraction failed', {
+        error,
+        rawApiResponse,
+        extractedText
+      });
+      setImportError(EXTRACTION_ERROR_MESSAGE);
+    } finally {
+      setImporting(false);
+    }
   };
 
   // Save validation
@@ -185,6 +398,8 @@ const AddRecipe = ({ onAddRecipe, onNavigateBack }) => {
       ],
       source: 'Custom Note',
       sourceType: 'amma',
+      sourceUrl: importedSourceUrl,
+      tags,
       isCustom: true
     };
 
@@ -232,6 +447,7 @@ const AddRecipe = ({ onAddRecipe, onNavigateBack }) => {
                 onClick={() => {
                   if (tile.id === 'type') {
                     setEditorExpanded(true);
+                    setSourceTag('Manual');
                   } else if (tile.id === 'link') {
                     setEditorExpanded(false);
                   }
@@ -260,12 +476,17 @@ const AddRecipe = ({ onAddRecipe, onNavigateBack }) => {
                 type="text"
                 placeholder="https://www.tiktok.com/@chef..."
                 value={url}
-                onChange={(e) => setUrl(e.target.value)}
+                onChange={(e) => {
+                  setUrl(e.target.value);
+                  const nextSourceTag = getSourceTag(e.target.value);
+                  setSourceTag(nextSourceTag);
+                  setImportError('');
+                }}
                 className="flex-1 h-[42px] px-3 bg-[#fff8f1] border border-[#8b5e3c]/20 text-[#1e1b17] placeholder-[#83746b]/50 rounded-lg focus:outline-none focus:border-[#6B3A2A] text-[14px]"
               />
               <button
                 onClick={handleImport}
-                disabled={importing || !url.trim()}
+                disabled={importing || !trimmedUrl || (isSocialUrl && !pastedRecipeText.trim())}
                 className="px-4 bg-[#6B3A2A] hover:bg-[#8b5e3c] disabled:opacity-50 text-white rounded-lg text-[13px] font-bold transition-colors flex items-center gap-1"
               >
                 {importing ? (
@@ -273,9 +494,36 @@ const AddRecipe = ({ onAddRecipe, onNavigateBack }) => {
                 ) : (
                   <span className="material-symbols-rounded text-[16px]">download</span>
                 )}
-                {importing ? '...' : 'Pull'}
+                {importing ? '...' : 'Import'}
               </button>
             </div>
+            {isSocialUrl && (
+              <p className="mt-2 rounded-lg bg-[#F5C242]/20 border border-[#F5C242]/40 px-3 py-2 text-[12px] font-semibold text-[#7A5C00] leading-snug">
+                {SOCIAL_URL_TIP}
+              </p>
+            )}
+            {showCaptionField && (
+              <>
+                <label className="block text-[11px] uppercase tracking-wider text-[#83746b] font-bold mt-3 mb-2">
+                  Paste the recipe text or caption here
+                </label>
+                <textarea
+                  placeholder="Copy the caption, description, or recipe text from the post and paste it here"
+                  rows="4"
+                  value={pastedRecipeText}
+                  onChange={(e) => {
+                    setPastedRecipeText(e.target.value);
+                    setImportError('');
+                  }}
+                  className="w-full px-3 py-2 bg-[#fff8f1] border border-[#8b5e3c]/20 text-[#1e1b17] placeholder-[#83746b]/50 rounded-lg focus:outline-none focus:border-[#6B3A2A] text-[14px] resize-none"
+                />
+              </>
+            )}
+            {importError && (
+              <p className="mt-2 text-[12px] font-semibold text-[#ba1a1a] leading-snug">
+                {importError}
+              </p>
+            )}
           </div>
         )}
 
@@ -295,6 +543,16 @@ const AddRecipe = ({ onAddRecipe, onNavigateBack }) => {
                 onChange={(e) => setRecipeTitle(e.target.value)}
                 className="w-full h-[46px] px-4 bg-[#faf3ec] border-b-2 border-[#8b5e3c]/20 text-[#1e1b17] placeholder-[#83746b]/40 rounded-t-lg focus:outline-none focus:border-[#6B3A2A] text-[15px] font-medium"
               />
+              {importedSourceUrl && (
+                <div className="mt-2 flex items-center gap-2">
+                  <span className="text-[10px] uppercase tracking-wider text-[#83746b] font-bold">
+                    Source
+                  </span>
+                  <span className="inline-flex max-w-full items-center rounded-full bg-[#8b5e3c]/10 px-2.5 py-1 text-[11px] font-semibold text-[#83746b]">
+                    {truncateUrl(importedSourceUrl)}
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Section 2: Ingredients list */}
@@ -379,7 +637,7 @@ const AddRecipe = ({ onAddRecipe, onNavigateBack }) => {
 
                       {/* Inline Amber Pill Badge once sensory description is typed */}
                       {ing.customAlavu && (
-                        <span className="badge-glow inline-flex items-center gap-1 bg-[#F5C242] text-[#1e1b17] text-[11px] font-semibold italic px-2 py-0.5 rounded-full border border-[#F5C242]/50">
+                        <span className="badge-glow inline-flex items-center gap-1 bg-[#F5C242] text-[#7A5C00] text-[11px] font-semibold italic px-2 py-0.5 rounded-full border border-[#F5C242]/50">
                           <span className="material-symbols-rounded text-[12px] font-normal not-italic">visibility</span>
                           {ing.customAlavu}
                         </span>
@@ -530,6 +788,55 @@ const AddRecipe = ({ onAddRecipe, onNavigateBack }) => {
                   onChange={(e) => setAmmasNotes(e.target.value)}
                   className="w-full bg-[#faf3ec]/60 p-2.5 text-[#1e1b17] placeholder-[#83746b]/50 text-[14px] italic font-sans rounded-r-lg border border-[#8b5e3c]/10 border-l-0 focus:outline-none focus:border-[#6B3A2A]"
                 />
+              </div>
+            </div>
+
+            {/* Section 6: Tags */}
+            <div>
+              <label className="block text-[11px] uppercase tracking-wider text-[#83746b] font-bold mb-2">
+                Tags
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {uniqueTags(["Amma's recipe", sourceTag, ...tags.filter((tag) => tag !== "Amma's recipe" && tag !== sourceTag)]).map((tag) => {
+                  const isActive = tags.includes(tag);
+                  return (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => toggleTag(tag)}
+                      className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[12px] font-bold transition-colors ${
+                        isActive
+                          ? 'bg-[#F5C242] text-[#7A5C00] border-[#F5C242]'
+                          : 'bg-[#fff8f1] text-[#6B3A2A] border-[#6B3A2A]/30'
+                      }`}
+                    >
+                      {tag}
+                      {isActive && <span className="text-[13px] leading-none">×</span>}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="mt-3 flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Add a custom tag"
+                  value={customTagInput}
+                  onChange={(e) => setCustomTagInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      addCustomTag();
+                    }
+                  }}
+                  className="flex-1 h-[38px] px-3 bg-[#faf3ec] border border-[#8b5e3c]/20 text-[#1e1b17] placeholder-[#83746b]/45 rounded-lg focus:outline-none focus:border-[#6B3A2A] text-[13px]"
+                />
+                <button
+                  type="button"
+                  onClick={addCustomTag}
+                  className="px-4 bg-[#6B3A2A] hover:bg-[#8b5e3c] text-white rounded-lg text-[12px] font-bold transition-colors"
+                >
+                  Add
+                </button>
               </div>
             </div>
 

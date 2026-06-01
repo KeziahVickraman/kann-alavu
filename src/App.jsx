@@ -4,6 +4,20 @@ import RecipeDetail from './RecipeDetail';
 import AddRecipe from './AddRecipe';
 import Notebook from './Notebook';
 
+const readStoredJson = (key, fallback) => {
+  try {
+    const saved = localStorage.getItem(key);
+    return saved ? JSON.parse(saved) : fallback;
+  } catch {
+    return fallback;
+  }
+};
+
+const normalizeRecipe = (recipe) => ({
+  ...recipe,
+  tags: Array.isArray(recipe.tags) ? recipe.tags : []
+});
+
 const INITIAL_PRESETS = [
   {
     id: 'fish-curry',
@@ -28,7 +42,8 @@ const INITIAL_PRESETS = [
       { type: 'photo', label: 'Sunset color', duration: '', icon: 'photo' }
     ],
     source: 'Amma',
-    sourceType: 'amma'
+    sourceType: 'amma',
+    tags: []
   },
   {
     id: 'pepper-rasam',
@@ -46,7 +61,8 @@ const INITIAL_PRESETS = [
     ],
     mediaStrip: [],
     source: 'Family Heritage',
-    sourceType: 'amma'
+    sourceType: 'amma',
+    tags: []
   },
   {
     id: 'honey-potatoes',
@@ -63,7 +79,8 @@ const INITIAL_PRESETS = [
     ],
     mediaStrip: [],
     source: 'TikTok',
-    sourceType: 'tiktok'
+    sourceType: 'tiktok',
+    tags: []
   },
   {
     id: 'samosas',
@@ -80,7 +97,8 @@ const INITIAL_PRESETS = [
     ],
     mediaStrip: [],
     source: 'Grandma',
-    sourceType: 'amma'
+    sourceType: 'amma',
+    tags: []
   },
   {
     id: 'poached-toast',
@@ -97,7 +115,8 @@ const INITIAL_PRESETS = [
     ],
     mediaStrip: [],
     source: 'Instagram',
-    sourceType: 'instagram'
+    sourceType: 'instagram',
+    tags: []
   }
 ];
 
@@ -106,9 +125,8 @@ function App() {
   const [selectedRecipeId, setSelectedRecipeId] = React.useState(null);
 
   const [recipes, setRecipes] = React.useState(() => {
-    const saved = localStorage.getItem('kann_alavu_custom_recipes');
-    const custom = saved ? JSON.parse(saved) : [];
-    return [...INITIAL_PRESETS, ...custom];
+    const custom = readStoredJson('kann_alavu_custom_recipes', []).map(normalizeRecipe);
+    return [...INITIAL_PRESETS.map(normalizeRecipe), ...custom];
   });
 
   const handleSelectRecipe = (id) => {
@@ -132,13 +150,12 @@ function App() {
   };
 
   const handleAddRecipe = (newRecipe) => {
-    const saved = localStorage.getItem('kann_alavu_custom_recipes');
-    const custom = saved ? JSON.parse(saved) : [];
-    const updatedCustom = [newRecipe, ...custom];
+    const custom = readStoredJson('kann_alavu_custom_recipes', []).map(normalizeRecipe);
+    const updatedCustom = [normalizeRecipe(newRecipe), ...custom];
     localStorage.setItem('kann_alavu_custom_recipes', JSON.stringify(updatedCustom));
-    setRecipes([...INITIAL_PRESETS, ...updatedCustom]);
-    // Redirect to Notebook view immediately to see the logged recipe
-    setCurrentScreen('notebook');
+    setRecipes([...INITIAL_PRESETS.map(normalizeRecipe), ...updatedCustom]);
+    setSelectedRecipeId(null);
+    setCurrentScreen('browse');
   };
 
   return (

@@ -1,5 +1,3 @@
-import React from 'react';
-
 const Notebook = ({ recipes, onSelectRecipe, onNavigateToAdd }) => {
   const customRecipes = recipes.filter(r => r.isCustom);
 
@@ -49,7 +47,7 @@ const Notebook = ({ recipes, onSelectRecipe, onNavigateToAdd }) => {
                     </p>
                   </div>
                   <div className="flex justify-between items-center mt-2">
-                    <span className="inline-flex items-center gap-1 bg-[#ffdfa0] text-[#6d5000] text-[10px] font-bold tracking-wider px-2 py-0.5 rounded-full uppercase">
+                    <span className="inline-flex items-center gap-1 bg-[#F5C242] text-[#7A5C00] text-[10px] font-bold tracking-wider px-2 py-0.5 rounded-full uppercase">
                       <span className="material-symbols-rounded text-[10px]">menu_book</span>
                       Custom Log
                     </span>

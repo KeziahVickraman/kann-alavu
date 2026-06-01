@@ -25,7 +25,8 @@ const RecipeDetail = ({ recipeId, recipes, onNavigateBack }) => {
       { type: 'voice', label: "Amma's Note", duration: '0:45', icon: 'mic' },
       { type: 'reel', label: 'Tamarind prep', duration: '0:15', icon: 'play_circle' },
       { type: 'photo', label: 'Sunset color', duration: '', icon: 'photo' }
-    ]
+    ],
+    tags: []
   };
 
   return (
@@ -57,12 +58,24 @@ const RecipeDetail = ({ recipeId, recipes, onNavigateBack }) => {
           {recipe.title}
         </h2>
         <div className="flex items-center gap-2 mt-2">
-          <span className="inline-flex items-center gap-1 bg-[#ffdfa0] text-[#6d5000] px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wider uppercase">
+          <span className="inline-flex items-center gap-1 bg-[#F5C242] text-[#7A5C00] px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wider uppercase">
             <span className="material-symbols-rounded text-[11px]">star</span>
             Kann Alavu
           </span>
           <span className="text-[12px] text-[#83746b]">Amma's Recipe Archive</span>
         </div>
+        {recipe.tags?.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {recipe.tags.map((tag) => (
+              <span
+                key={tag}
+                className="inline-flex items-center rounded-full bg-[#F5C242] px-2.5 py-0.5 text-[11px] font-bold text-[#7A5C00]"
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+        )}
 
         {/* Amma's Notes */}
         <div className="mt-6 p-4 bg-[#faf3ec] border-l-4 border-[#8b5e3c] rounded-r-lg">
@@ -89,7 +102,7 @@ const RecipeDetail = ({ recipeId, recipes, onNavigateBack }) => {
                 className="flex-shrink-0 flex items-center gap-3 px-4 py-3 bg-[#f4ede5] hover:bg-[#eee7df] active:scale-95 transition-all rounded-[12px] border border-[#8b5e3c]/15 text-left min-w-[160px]"
               >
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                  item.type === 'voice' && voicePlaying ? 'bg-[#ffbf00] text-[#1e1b17] animate-pulse' : 'bg-[#8b5e3c]/10 text-[#6f4627]'
+                  item.type === 'voice' && voicePlaying ? 'bg-[#F5C242] text-[#7A5C00] animate-pulse' : 'bg-[#8b5e3c]/10 text-[#6f4627]'
                 }`}>
                   <span className="material-symbols-rounded text-[18px]">
                     {item.type === 'voice' && voicePlaying ? 'pause' : item.icon}
@@ -129,7 +142,7 @@ const RecipeDetail = ({ recipeId, recipes, onNavigateBack }) => {
                 </div>
                 {ing.badge && (
                   <div className="mt-1.5 self-start">
-                    <span className="badge-glow inline-flex items-center gap-1 bg-[#ffbf00] text-[#1e1b17] font-sans text-[11px] font-semibold italic px-2.5 py-0.5 rounded-full">
+                    <span className="badge-glow inline-flex items-center gap-1 bg-[#F5C242] text-[#7A5C00] font-sans text-[11px] font-semibold italic px-2.5 py-0.5 rounded-full">
                       <span className="material-symbols-rounded text-[12px] font-normal not-italic">visibility</span>
                       {ing.badge}
                     </span>

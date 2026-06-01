@@ -1,18 +1,21 @@
 import React from 'react';
 
-const BrowseRecipes = ({ recipes, onSelectRecipe, onNavigateToAdd }) => {
+const BrowseRecipes = ({ recipes, onSelectRecipe }) => {
   const [searchQuery, setSearchQuery] = React.useState('');
-  const [selectedFilter, setSelectedFilter] = React.useState('All');
+  const [selectedTag, setSelectedTag] = React.useState('All');
 
-  const filters = ['All', "Amma's Recipes", 'Kann Alavu', 'TikTok Saved'];
+  const tagPriority = ["Amma's recipe", 'TikTok', 'Instagram', 'YouTube', 'Manual'];
+  const recipeTags = [...new Set(recipes.flatMap((recipe) => recipe.tags || []))];
+  const priorityTags = tagPriority.filter((tag) => recipeTags.includes(tag));
+  const customTags = recipeTags
+    .filter((tag) => !tagPriority.includes(tag))
+    .sort((a, b) => a.localeCompare(b));
+  const filters = ['All', ...priorityTags, ...customTags];
 
   const filteredRecipes = recipes.filter(recipe => {
     const matchesSearch = recipe.title.toLowerCase().includes(searchQuery.toLowerCase());
-    if (selectedFilter === 'All') return matchesSearch;
-    if (selectedFilter === "Amma's Recipes") return matchesSearch && (recipe.sourceType === 'amma' && recipe.source !== 'Family Heritage' && !recipe.isCustom);
-    if (selectedFilter === 'Kann Alavu') return matchesSearch && (recipe.id === 'fish-curry' || recipe.ingredients.some(i => i.badge));
-    if (selectedFilter === 'TikTok Saved') return matchesSearch && recipe.sourceType === 'tiktok';
-    return matchesSearch;
+    if (selectedTag === 'All') return matchesSearch;
+    return matchesSearch && (recipe.tags || []).includes(selectedTag);
   });
 
   return (
@@ -43,19 +46,19 @@ const BrowseRecipes = ({ recipes, onSelectRecipe, onNavigateToAdd }) => {
         </div>
       </div>
 
-      {/* Filter Chips */}
+      {/* Tag Filter Chips */}
       <div className="mb-6 flex-shrink-0">
         <div className="flex gap-2 overflow-x-auto px-[20px] hide-scrollbar py-1">
           {filters.map((filter) => {
-            const isActive = selectedFilter === filter;
+            const isActive = selectedTag === filter;
             return (
               <button
                 key={filter}
-                onClick={() => setSelectedFilter(filter)}
-                className={`flex-shrink-0 px-4 py-2 rounded-full text-[13px] font-semibold transition-all duration-200 ${
+                onClick={() => setSelectedTag(filter)}
+                className={`flex-shrink-0 px-4 py-2 rounded-full border text-[13px] font-semibold transition-all duration-200 ${
                   isActive
-                    ? 'bg-[#8b5e3c] text-[#fff8f1] shadow-sm'
-                    : 'bg-[#faf3ec] text-[#51443c] hover:bg-[#eee7df]'
+                    ? 'bg-[#6B3A2A] text-[#F5EDE0] border-[#6B3A2A] shadow-sm'
+                    : 'bg-[#faf3ec] text-[#6B3A2A] border-[#6B3A2A]/30 hover:bg-[#eee7df]'
                 }`}
               >
                 {filter}
