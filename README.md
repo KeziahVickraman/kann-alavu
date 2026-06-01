@@ -1,16 +1,77 @@
-# React + Vite
+# Kann Alavu — கண் அளவு
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+> *Measuring by eye. Preserving recipes the way they actually live.*
 
-Currently, two official plugins are available:
+A warm, personal recipe keeper built to capture home cooking knowledge — especially the kind that lives in voice notes, TikTok saves, and instinct rather than precise measurements.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+---
 
-## React Compiler
+## What it does
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **Import from anywhere** — paste a TikTok or Instagram link, record a voice note, scan a photo, or type it out
+- **Kann alavu fields** — every ingredient can hold both an exact amount *and* a visual description ("a lemon-sized ball of tamarind", "until the colour looks right")
+- **Amma's notes** — a freeform memory block per recipe for the things that don't fit in steps
+- **iOS/Android share sheet** — share directly from TikTok or Instagram and the recipe lands in your Imports tab for review
+- **Imports tab** — a queue where saved links are processed, reviewed, and moved into your collection
 
-## Expanding the ESLint configuration
+---
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Stack
+
+- **Frontend** — React Native (Expo)
+- **Backend** — Firebase (auth, Firestore, storage)
+- **AI extraction** — Claude API (recipe parsing, kann alavu translation, ingredient structuring)
+- **Prototyped in** — Google AI Studio → exported to Antigravity 2.0
+
+---
+
+## Getting started
+
+```bash
+git clone https://github.com/your-username/kann-alavu.git
+cd kann-alavu
+npm install
+npx expo start
+```
+
+---
+
+## Project structure
+
+```
+kann-alavu/
+├── screens/
+│   ├── Browse.jsx        # Recipe grid with filters
+│   ├── AddRecipe.jsx     # Import flow + kann alavu editor
+│   └── RecipeDetail.jsx  # Full recipe with badges + notes
+├── components/
+│   ├── KannAlavuBadge    # Amber pill for eye measurements
+│   ├── SourceBadge       # TikTok / Instagram / voice / manual
+│   └── AmmaNotesBlock    # Freeform memory field
+├── services/
+│   ├── extractRecipe.js  # Claude API — URL → structured recipe
+│   └── firebase.js       # Firestore read/write
+└── share-extension/      # iOS share sheet + Android intent
+```
+
+---
+
+## Roadmap
+
+- [x] Core three screens (Browse, Add, Detail)
+- [x] Kann alavu ingredient fields
+- [ ] TikTok/Instagram URL extraction via Claude
+- [ ] iOS share extension (TestFlight MVP)
+- [ ] Voice note transcription + parsing
+- [ ] Family sharing — Amma's Recipes collection
+- [ ] Android share intent
+
+---
+
+## Philosophy
+
+South Asian home cooking lives in embodied memory — *cook until it smells right from the next room*, *fry the mustard seeds until they pop twice, not once*. This app exists to preserve that knowledge alongside structured data, not replace it.
+
+---
+
+*Built with love, tamarind, and too many voice notes.*
